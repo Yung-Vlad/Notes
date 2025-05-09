@@ -1,3 +1,5 @@
+from fastapi import HTTPException, status
+
 import sqlite3, os
 
 from .general import DB_PATH
@@ -22,11 +24,14 @@ def delete_notes_by_user_id(user_id: int) -> dict:
         """, (user_id,))
 
         if cursor.rowcount == 0:
-            return {"message": "Notes not found"}
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Notes not found"
+            )
 
         conn.commit()
 
-        return {"message": "Notes are successfully deleted"}
+        return { "message": "Notes are successfully deleted" }
 
 
 def delete_statistics_by_user_id(user_id: int) -> None:
@@ -53,7 +58,10 @@ def delete_user_by_id(user_id: int) -> dict:
 
         row = cursor.fetchone()
         if not row:
-            return { "message": "User not found" }
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
 
         # Delete private key
         delete_user_pkey(row[0])
@@ -67,7 +75,7 @@ def delete_user_by_id(user_id: int) -> dict:
         delete_notes_by_user_id(user_id)
         delete_statistics_by_user_id(user_id)
 
-        return {"message": "User is successfully deleted"}
+        return { "message": "User is successfully deleted" }
 
 
 def delete_note_by_id(note_id: int) -> dict:
@@ -80,7 +88,10 @@ def delete_note_by_id(note_id: int) -> dict:
         conn.commit()
 
         if cursor.rowcount == 0:
-            return {"message": "Note not found"}
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Note not found"
+            )
 
         return {"message": "Note is successfully deleted"}
 
@@ -95,7 +106,10 @@ def delete_all_users() -> dict:
 
         row = cursor.fetchall()
         if not row:
-            return { "message": "No users found" }
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No users found"
+            )
 
         # Delete private keys
         delete_user_pkey([name[0] for name in row])

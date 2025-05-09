@@ -1,8 +1,12 @@
-import sqlite3
-from models.admins import AdminModel
-from models.users import UserCreateModel
+from fastapi import HTTPException, status
+
+import sqlite3, base64
+from datetime import datetime
+from schemas.admins import AdminSchema
+from schemas.users import UserCreateSchema
 from .general import DB_PATH
 from cipher.generate import generate_asymmetric_keys
+from secure.notification import notify
 
 
 def get_user(username: str) -> dict[str: str] | None:
@@ -24,7 +28,7 @@ def get_user(username: str) -> dict[str: str] | None:
         return None
 
 
-def create_user(user: UserCreateModel | AdminModel, is_admin=False) -> None:
+def create_user(user: UserCreateSchema | AdminSchema, is_admin=False) -> None:
     """
     Registration new user or admin and adding him to db
     """
@@ -83,7 +87,10 @@ def get_statistics(user_id: int) -> dict:
 
         data = cursor.fetchone()
         if not data or len(data) < 5:
-            return { "message": "Something went wrong..." }
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Something went wrong..."
+            )
 
         return {
             "username": data[0], "email": data[1], "statistics": {
@@ -92,6 +99,58 @@ def get_statistics(user_id: int) -> dict:
                 "deleted": data[4]
             }
         }
+
+
+def restore_password(user_id: int, key_code: bytes, expired_time: datetime, email: str) -> dict:
+    check_expired_time()
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO password_restore VALUES (?, ?, ?)
+        """, (user_id, key_code, expired_time))
+        conn.commit()
+
+        # Send email
+        notify(email,f"Restore your password: "
+                     f"http://127.0.0.1/users/verify-recover-password/{user_id}/{base64.b64encode(key_code).decode()}, "
+                     f"expires in: {expired_time.strftime('%H:%M %d-%m-%Y')}")
+
+        return { "message": "Confirm recovering on your email" }
+
+
+def check_restore_password_exists(user_id: int) -> str | None:
+    """
+    If user already send recovery password request
+    """
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT key FROM password_restore WHERE user_id = ? AND expired_at > ?
+        """, (user_id, datetime.now()))
+
+        key = cursor.fetchone()
+        if key is None:
+            return None
+
+        return base64.b64encode(key[0]).decode()
+
+
+def check_expired_time() -> None:
+    """
+    If time is expired then delete access from table
+    """
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            DELETE FROM password_restore WHERE expired_at < ?
+        """, (datetime.now(), ))
+        conn.commit()
 
 
 def get_email(user_id: int) -> str:

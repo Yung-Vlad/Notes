@@ -1,37 +1,39 @@
+from fastapi import status
+
 import re
 from zxcvbn import zxcvbn
 from fastapi import HTTPException
 
 from database.users import get_user
 from database.general import check_existing_email
-from models.users import UserCreateModel
-from models.admins import AdminModel
+from schemas.users import UserCreateSchema
+from schemas.admins import AdminSchema
 
 
 class Checker:
     @staticmethod
-    def check_user_data(user: UserCreateModel | AdminModel) -> None:
+    def check_user_data(user: UserCreateSchema | AdminSchema) -> None:
         # Check username
         existing_user = get_user(user.username)
         if existing_user:
-            raise HTTPException(status_code=400, detail="Username already busy!")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Username already busy!")
 
         # Check password
         if user.password != user.repeat_password:
-            raise HTTPException(status_code=400, detail="Passwords aren't identity!")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Passwords aren't identity!")
 
         password_error = Validator.check_password_complexity(user.password)
         if password_error is not None:
-            raise HTTPException(status_code=400, detail=password_error)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=password_error)
 
         # Check existing email
         existing_email = check_existing_email(user.email)
         if existing_email:
-            raise HTTPException(status_code=400, detail="Email already busy!")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email already busy!")
 
         # Check valid email
         if not Validator.check_valid_email(user.email):
-            raise HTTPException(status_code=400, detail="Email isn't valid!")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Email isn't valid!")
 
 
 class Validator:

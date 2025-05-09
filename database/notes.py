@@ -1,12 +1,14 @@
+from fastapi import HTTPException, status
+
 import sqlite3, base64
-from models.notes import NoteInternalModel, NoteUpdateInternalModel
+from schemas.notes import NoteInternalSchema, NoteUpdateInternalSchema
 from typing import Optional
 
 from .general import DB_PATH
 from .accesses import check_is_owner_of_note
 
 
-def add_note(note: NoteInternalModel, from_user: int) -> None:
+def add_note(note: NoteInternalSchema, from_user: int) -> None:
     """
     Add new note to db
     :param note: all info about this note (header, content, tags)
@@ -66,7 +68,10 @@ def get_all_notes(user_id: int, offset: int, limit: int, tags: Optional[str]) ->
 
         data = cursor.fetchall()
         if not data:  # If nothing found
-            return { "message": "No notes found!" }
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No notes found!"
+            )
 
         # Increase counter for reading notes
         cursor.execute("""
@@ -101,7 +106,10 @@ def get_note_by_id(note_id: int, user_id: int) -> dict:
 
         data = cursor.fetchone()
         if not data:
-            return { "message": f"Note not found or access denied!" }
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Note not found or access denied!"
+            )
 
         # Increment counter for reading notes
         cursor.execute("""
@@ -133,7 +141,10 @@ def get_aes_key(note_id: int, user_id: int) -> str:
 
         data = cursor.fetchone()
         if not data:
-            return "None"
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="AES key not found!"
+            )
 
         return data[0]
 
@@ -152,7 +163,10 @@ def delete_note_by_id(note_id: int, user_id: int) -> dict:
 
         # If not exist note with :note_id or this user isn't owner this note
         if cursor.rowcount == 0:
-            return { "message": "Note not found or access denied!" }
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Note not found or access denied!"
+            )
 
         # Delete all accesses for this note
         cursor.execute("""
@@ -187,7 +201,7 @@ def check_access(note_id: int, user_id: int) -> bool:
         return bool(cursor.fetchone())
 
 
-def update_note(note: NoteUpdateInternalModel) -> dict:
+def update_note(note: NoteUpdateInternalSchema) -> dict:
     """
     Update note in db after editing
     """

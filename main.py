@@ -1,14 +1,16 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 
-from routers import users, notes, admins, accesses
+from routers import users, notes, admins, accesses, errors_handler
 from database.general import init_db
-
 
 app = FastAPI()
 app.include_router(admins.router)
 app.include_router(users.router)
 app.include_router(notes.router)
 app.include_router(accesses.router)
+app.add_exception_handler(RequestValidationError, errors_handler.validation_exception_handler)
+
 
 if __name__ == "__main__":
     init_db()

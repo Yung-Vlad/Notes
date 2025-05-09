@@ -72,7 +72,8 @@ def init_db() -> None:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS password_restore (
                 user_id INTEGER,
-                key TEXT UNIQUE NOT NULL,
+                key BLOB UNIQUE NOT NULL,
+                expired_at DATETIME NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
         """)

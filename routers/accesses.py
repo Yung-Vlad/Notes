@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 import base64
-from models.accesses import AccessModel, AccessInternalModel, Permission
+from schemas.accesses import AccessSchema, AccessInternalSchema, PermissionSchema
 import database.accesses as db
 from database.users import get_public_key
 from database.notes import get_aes_key
@@ -16,10 +16,10 @@ router = APIRouter(prefix="/accesses", tags=["Accesses"])
 @router.post("/set-permission",
              summary="Set permission to your notes",
              description="Set permissions to your notes to be shared other users")
-def set_permission(access: AccessModel,
-                   permission: Permission = Permission.read,
-                   curr_user: dict = Depends(JWT.get_current_user),
-                   _ = Depends(CSRF.verify_csrf_token)) -> dict:
+async def set_permission(access: AccessSchema,
+                         permission: PermissionSchema = PermissionSchema.read,
+                         curr_user: dict = Depends(JWT.get_current_user),
+                         _ = Depends(CSRF.verify_csrf_token)) -> dict:
 
     curr_user_id = curr_user["id"]
     curr_user_name = curr_user["username"]
@@ -33,8 +33,8 @@ def set_permission(access: AccessModel,
     decrypted_aes_key = decrypt_aes_key(private_key, aes_key)  # Decrypted aes_key
     encrypted_aes_key = encrypt_aes_key(public_key, decrypted_aes_key)  # Encrypted aes_key
 
-    permission_value = 1 if permission == Permission.read else 2
-    access = AccessInternalModel(**access.dict(), key=base64.b64encode(encrypted_aes_key), permission=permission_value)
+    permission_value = 1 if permission == PermissionSchema.read else 2
+    access = AccessInternalSchema(**access.dict(), key=base64.b64encode(encrypted_aes_key), permission=permission_value)
 
     return db.set_permission(access, curr_user_id)
 
@@ -42,16 +42,16 @@ def set_permission(access: AccessModel,
 @router.patch("/edit-permission",
             summary="Edit permission",
             description="Edit permission for special user to your note")
-def edit_permission(access: AccessModel,
-                    permission: Permission = Permission.read,
-                    curr_user: dict = Depends(JWT.get_current_user),
-                    _ = Depends(CSRF.verify_csrf_token)) -> dict:
+async def edit_permission(access: AccessSchema,
+                          permission: PermissionSchema = PermissionSchema.read,
+                          curr_user: dict = Depends(JWT.get_current_user),
+                          _ = Depends(CSRF.verify_csrf_token)) -> dict:
     curr_user_id = curr_user["id"]
     if curr_user_id == access.user_id:  # If user enters his id
         return {"message": "You can't change permission to yourself!"}
 
-    permission_value = 1 if permission == Permission.read else 2
-    access = AccessInternalModel(**access.dict(), key=None, permission=permission_value)
+    permission_value = 1 if permission == PermissionSchema.read else 2
+    access = AccessInternalSchema(**access.dict(), key=None, permission=permission_value)
 
     return db.edit_permission(access, curr_user_id)
 
@@ -59,9 +59,9 @@ def edit_permission(access: AccessModel,
 @router.delete("/delete-permission",
                summary="Delete permission to your notes",
                description="Delete permission to your notes to be shared other users")
-def delete_permission(access: AccessModel,
-                      curr_user: dict = Depends(JWT.get_current_user),
-                      _ = Depends(CSRF.verify_csrf_token)) -> dict:
+async def delete_permission(access: AccessSchema,
+                            curr_user: dict = Depends(JWT.get_current_user),
+                            _ = Depends(CSRF.verify_csrf_token)) -> dict:
 
     curr_user_id = curr_user["id"]
     if curr_user_id == access.user_id:  # If user enters his id

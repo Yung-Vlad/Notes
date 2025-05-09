@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
 
 import os, shutil
@@ -9,7 +9,7 @@ from .users import check_logged
 from secure.tokens import JWT, CSRF
 from secure.hashing import Hasher
 from secure.validating import Checker
-from models.admins import AdminModel
+from schemas.admins import AdminSchema
 from database.general import DB_PATH
 from database.admin import delete_user_by_id, delete_note_by_id, delete_all_users
 from database.users import create_user
@@ -23,12 +23,12 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 @router.post("/create-admin", summary="Create superuser (admin)")
-def create_admin(request: Request, admin: AdminModel) -> dict:
+async def create_admin(request: Request, admin: AdminSchema) -> dict:
     if check_logged(request):
         return { "message": "First you need to logout" }
 
     if admin.key != ADMIN_KEY:
-        raise HTTPException(status_code=400, detail="Invalid admin key!")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid admin key!")
 
     Checker.check_user_data(admin)
 
@@ -39,7 +39,7 @@ def create_admin(request: Request, admin: AdminModel) -> dict:
 
 
 @router.post("/backup", summary="Create db backup")
-def backup(_ = Depends(JWT.get_admin),
+async def backup(_ = Depends(JWT.get_admin),
            __ = Depends(CSRF.verify_csrf_token)) -> dict:
     if not os.path.exists(BACKUP_FOLDER):  # If not exists folder for backups
         os.mkdir(BACKUP_FOLDER)
@@ -51,18 +51,18 @@ def backup(_ = Depends(JWT.get_admin),
 
 
 @router.get("/download-backup", summary="Download backup if exists to local")
-def download_backup(_: dict = Depends(JWT.get_admin),
+async def download_backup(_: dict = Depends(JWT.get_admin),
                     __: None = Depends(CSRF.verify_csrf_token)) -> FileResponse:
     backup_path = os.path.join(BACKUP_FOLDER, "backup.sqlite3")
 
     if not os.path.exists(backup_path):  # If not exist any backups
-        raise HTTPException(status_code=404, detail="Backup files not found!")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backup files not found!")
 
     return FileResponse(backup_path, filename=f"backup ({date.today()}).sqlite3")
 
 
 @router.delete("/delete-user/{user_id}", summary="Delete user by id")
-def delete_user(user_id: int,
+async def delete_user(user_id: int,
                 _ = Depends(JWT.get_admin),
                 __ = Depends(CSRF.verify_csrf_token)) -> dict:
 
@@ -70,14 +70,14 @@ def delete_user(user_id: int,
 
 
 @router.delete("/delete-users", summary="Delete all users")
-def delete_users(_ = Depends(JWT.get_admin),
+async def delete_users(_ = Depends(JWT.get_admin),
                 __ = Depends(CSRF.verify_csrf_token)) -> dict:
 
     return delete_all_users()
 
 
 @router.delete("/delete-note/{note_id}", summary="Delete note by id")
-def delete_note(note_id: int,
+async def delete_note(note_id: int,
                 _=Depends(JWT.get_admin),
                 __=Depends(CSRF.verify_csrf_token)) -> dict:
 

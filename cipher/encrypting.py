@@ -4,7 +4,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 
 import base64, os
-from models.notes import NoteInternalModel, NoteUpdateInternalModel
+from schemas.notes import NoteInternalSchema, NoteUpdateInternalSchema
 
 
 # Encrypting aes_key by public key
@@ -39,7 +39,7 @@ def symmetric_encrypt_data(key: bytes, data: str) -> str:
 
 
 # Symmetric encrypting note
-def symmetric_encrypt_note(key: bytes, note: NoteInternalModel | NoteUpdateInternalModel) -> NoteInternalModel | NoteUpdateInternalModel:
+def symmetric_encrypt_note(key: bytes, note: NoteInternalSchema | NoteUpdateInternalSchema) -> NoteInternalSchema | NoteUpdateInternalSchema:
 
     note.header = symmetric_encrypt_data(key, note.header)
     note.text = symmetric_encrypt_data(key, note.text)

@@ -15,7 +15,7 @@ def notify(receiver: str, text: str) -> None:
     try:
 
         message = MIMEText(text)
-        message["Subject"] = "NoteAPI: note access notification"
+        message["Subject"] = "NotesAPI"
         message["To"] = receiver
 
         # Securely sending
