@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 import sqlite3
 from schemas.accesses import AccessInternalSchema, AccessSchema
 
-from .general import DB_PATH
+from .general import get_cursor
 from .users import get_email
 from secure.notification import notify
 
@@ -15,8 +15,7 @@ def set_permission(access: AccessInternalSchema, owner_id: int) -> dict:
             detail="This action can only be performed by owner of note"
         )
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             INSERT OR IGNORE INTO accesses (note_id, user_id, key, permission) VALUES (?, ?, ?, ?)
@@ -28,16 +27,14 @@ def set_permission(access: AccessInternalSchema, owner_id: int) -> dict:
                 detail="This user already has access to this note"
             )
 
-        conn.commit()
+        #### Send email
+        permission = "read" if access.permission == 1 else "read & write"
+        notify(get_email(access.user_id),
+               make_notification_text({ "email": get_email(owner_id),
+                                        "note_id": access.note_id,
+                                        "permission": f"Gave access to {permission}" }))
 
-        ##### Send email
-        # permission = "read" if access.permission == 1 else "read & write"
-        # notify(get_email(access.user_id),
-        #        make_notification_text({ "email": get_email(owner_id),
-        #                                 "note_id": access.note_id,
-        #                                 "permission": f"Gave access to {permission}" }))
-
-        return { "message": "User successfully gained access" }
+    return { "message": "User successfully gained access" }
 
 
 def delete_permission(access: AccessSchema, owner_id: int) -> dict:
@@ -47,8 +44,7 @@ def delete_permission(access: AccessSchema, owner_id: int) -> dict:
             detail="This action can only be performed by owner of note"
         )
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             DELETE FROM accesses WHERE note_id = ? AND user_id = ?
@@ -60,14 +56,12 @@ def delete_permission(access: AccessSchema, owner_id: int) -> dict:
                 detail="This user doesn't have access to this note"
             )
 
-        conn.commit()
+        #### Send email
+        notify(get_email(access.user_id), make_notification_text({ "email": get_email(owner_id),
+                                                                   "note_id": access.note_id,
+                                                                   "permission": "Take away access" }))
 
-        ##### Send email
-        # notify(get_email(access.user_id), make_notification_text({ "email": get_email(owner_id),
-        #                                                                "note_id": access.note_id,
-        #                                                                "permission": "Take away access" }))
-
-        return { "message": "User successfully lost access" }
+    return { "message": "User successfully lost access" }
 
 
 def edit_permission(access: AccessInternalSchema, owner_id: int) -> dict:
@@ -77,8 +71,7 @@ def edit_permission(access: AccessInternalSchema, owner_id: int) -> dict:
             detail="This action can only be performed by owner of note"
         )
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT permission FROM accesses WHERE note_id = ? AND user_id = ?
@@ -100,21 +93,18 @@ def edit_permission(access: AccessInternalSchema, owner_id: int) -> dict:
             UPDATE accesses SET permission = ? WHERE note_id = ? AND user_id = ?
         """, (access.permission, access.note_id, access.user_id))
 
-        conn.commit()
+        #### Send email
+        permission = "read" if access.permission == 1 else "read & write"
+        notify(get_email(access.user_id),
+               make_notification_text({ "email": get_email(owner_id),
+                                        "note_id": access.note_id,
+                                        "permission": f"Change your access to {permission}" }))
 
-        ##### Send email
-        # permission = "read" if access.permission == 1 else "read & write"
-        # notify(get_email(access.user_id),
-        #        make_notification_text({ "email": get_email(owner_id),
-        #                                 "note_id": access.note_id,
-        #                                 "permission": f"Change your access to {permission}" }))
-
-        return { "message": "Rights successfully changed" }
+    return { "message": "Rights successfully changed" }
 
 
 def check_is_owner_of_note(user_id: int, note_id: int) -> bool:
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT * FROM notes WHERE id = ? AND from_user_id = ?
@@ -123,7 +113,7 @@ def check_is_owner_of_note(user_id: int, note_id: int) -> bool:
         if not cursor.fetchone():
             return False
 
-        return True
+    return True
 
 
 def make_notification_text(data: dict) -> str:

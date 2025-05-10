@@ -1,9 +1,24 @@
 import sqlite3, os
 from dotenv import load_dotenv
+from contextlib import contextmanager
 
 
 load_dotenv()
 DB_PATH = os.getenv("DB_PATH")
+
+
+@contextmanager
+def get_cursor() -> sqlite3.Cursor:
+    """
+    Context manager for sqlite.Cursor
+    """
+
+    with sqlite3.connect(DB_PATH) as conn:
+        try:
+            yield conn.cursor()
+            conn.commit()
+        except sqlite3.DatabaseError:
+            conn.rollback()
 
 
 def init_db() -> None:
@@ -13,8 +28,7 @@ def init_db() -> None:
 
     check_db_dir()
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         # Table users
         cursor.execute("""
@@ -78,16 +92,13 @@ def init_db() -> None:
             );
         """)
 
-        conn.commit()
-
 
 def check_existing_email(email: str) -> bool:
     """
     Checking if email is already registered
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT * FROM users WHERE email = ?
@@ -97,7 +108,7 @@ def check_existing_email(email: str) -> bool:
         if user:
             return True
 
-        return False
+    return False
 
 
 def check_db_dir() -> None:

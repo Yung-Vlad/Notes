@@ -1,3 +1,5 @@
+from fastapi import HTTPException, status
+
 import smtplib, os
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
@@ -24,4 +26,4 @@ def notify(receiver: str, text: str) -> None:
             server.send_message(message)
 
     except smtplib.SMTPConnectError as e:
-        print(e.smtp_error)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.smtp_error)

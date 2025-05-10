@@ -1,8 +1,8 @@
 from fastapi import HTTPException, status
 
-import sqlite3, os
+import os
 
-from .general import DB_PATH
+from .general import get_cursor
 from cipher.generate import KEYS_PATH
 
 
@@ -11,8 +11,7 @@ def delete_notes_by_user_id(user_id: int) -> dict:
     Delete all notes which belong specific user
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         # Delete all accesses for this notes
         cursor.execute("""
@@ -29,9 +28,7 @@ def delete_notes_by_user_id(user_id: int) -> dict:
                 detail="Notes not found"
             )
 
-        conn.commit()
-
-        return { "message": "Notes are successfully deleted" }
+    return { "message": "Notes are successfully deleted" }
 
 
 def delete_statistics_by_user_id(user_id: int) -> None:
@@ -39,18 +36,15 @@ def delete_statistics_by_user_id(user_id: int) -> None:
     Delete statistics for specific user
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             DELETE FROM statistics WHERE user_id = ?
         """, (user_id,))
-        conn.commit()
 
 
 def delete_user_by_id(user_id: int) -> dict:
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT username FROM users WHERE id = ?
@@ -69,23 +63,20 @@ def delete_user_by_id(user_id: int) -> dict:
         cursor.execute("""
             DELETE FROM users WHERE id = ? AND is_admin = 0
         """, (user_id,))
-        conn.commit()
 
         # Delete his notes and statistics
         delete_notes_by_user_id(user_id)
         delete_statistics_by_user_id(user_id)
 
-        return { "message": "User is successfully deleted" }
+    return { "message": "User is successfully deleted" }
 
 
 def delete_note_by_id(note_id: int) -> dict:
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             DELETE FROM notes WHERE id = ?
         """, (note_id,))
-        conn.commit()
 
         if cursor.rowcount == 0:
             raise HTTPException(
@@ -93,12 +84,11 @@ def delete_note_by_id(note_id: int) -> dict:
                 detail="Note not found"
             )
 
-        return {"message": "Note is successfully deleted"}
+    return {"message": "Note is successfully deleted"}
 
 
 def delete_all_users() -> dict:
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT username FROM users WHERE is_admin = 0
@@ -120,9 +110,8 @@ def delete_all_users() -> dict:
             DELETE FROM statistics WHERE user_id NOT IN (SELECT id FROM users);
             DELETE FROM accesses WHERE user_id NOT IN (SELECT id FROM users);
         """)
-        conn.commit()
 
-        return { "message": "All usual users and their notes, statistics and keys are deleted" }
+    return { "message": "All usual users and their notes, statistics and keys are deleted" }
 
 
 # Delete private key by username
@@ -135,4 +124,5 @@ def delete_user_pkey(username: str | list) -> None:
 
         os.remove(f"{KEYS_PATH}/{username}_key.pem")
     except FileNotFoundError as e:
-        print(e)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Private key not found!")

@@ -4,18 +4,17 @@ import sqlite3, base64
 from datetime import datetime
 from schemas.admins import AdminSchema
 from schemas.users import UserCreateSchema
-from .general import DB_PATH
+from .general import get_cursor
 from cipher.generate import generate_asymmetric_keys
 from secure.notification import notify
 
 
-def get_user(username: str) -> dict[str: str] | None:
+def get_user(username: str) -> dict | None:
     """
     Getting user from db by username
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT * FROM users WHERE username = ?
@@ -25,7 +24,7 @@ def get_user(username: str) -> dict[str: str] | None:
         if user:
             return { "id": user[0], "username": user[1], "password": user[2], "email": user[3], "is_admin": user[4] }
 
-        return None
+    return None
 
 
 def create_user(user: UserCreateSchema | AdminSchema, is_admin=False) -> None:
@@ -36,20 +35,17 @@ def create_user(user: UserCreateSchema | AdminSchema, is_admin=False) -> None:
     # Get pub_key
     public_key = generate_asymmetric_keys(user.username)
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         # Table users
         cursor.execute("""
             INSERT INTO users (username, password, email, public_key, is_admin) VALUES (?, ?, ?, ?, ?)
         """, (user.username, user.password, user.email, public_key, is_admin))
-        conn.commit()
 
         # Table statistics
         cursor.execute("""
             INSERT INTO statistics VALUES ((SELECT id FROM users WHERE username = ?), ?, ?, ?)
         """, (user.username, 0, 0, 0))
-        conn.commit()
 
 
 def reset_password(user_id: int, new_password: str) -> None:
@@ -57,13 +53,11 @@ def reset_password(user_id: int, new_password: str) -> None:
     Reset password for user by user_id
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             UPDATE users SET password = ? WHERE id = ?
         """, (new_password, user_id))
-        conn.commit()
 
 
 def get_statistics(user_id: int) -> dict:
@@ -71,8 +65,7 @@ def get_statistics(user_id: int) -> dict:
     Get statistics for specific user
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT users.username, 
@@ -104,20 +97,18 @@ def get_statistics(user_id: int) -> dict:
 def restore_password(user_id: int, key_code: bytes, expired_time: datetime, email: str) -> dict:
     check_expired_time()
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             INSERT INTO password_restore VALUES (?, ?, ?)
         """, (user_id, key_code, expired_time))
-        conn.commit()
 
         # Send email
         notify(email,f"Restore your password: "
                      f"http://127.0.0.1/users/verify-recover-password/{user_id}/{base64.b64encode(key_code).decode()}, "
                      f"expires in: {expired_time.strftime('%H:%M %d-%m-%Y')}")
 
-        return { "message": "Confirm recovering on your email" }
+    return { "message": "Confirm recovering on your email" }
 
 
 def check_restore_password_exists(user_id: int) -> str | None:
@@ -125,8 +116,7 @@ def check_restore_password_exists(user_id: int) -> str | None:
     If user already send recovery password request
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT key FROM password_restore WHERE user_id = ? AND expired_at > ?
@@ -144,18 +134,15 @@ def check_expired_time() -> None:
     If time is expired then delete access from table
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             DELETE FROM password_restore WHERE expired_at < ?
         """, (datetime.now(), ))
-        conn.commit()
 
 
 def get_email(user_id: int) -> str:
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT email FROM users WHERE id = ?
@@ -165,8 +152,7 @@ def get_email(user_id: int) -> str:
 
 
 def get_public_key(user_id: int) -> bytes:
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT public_key FROM users WHERE id = ?

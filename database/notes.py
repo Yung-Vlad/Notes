@@ -1,10 +1,10 @@
 from fastapi import HTTPException, status
 
-import sqlite3, base64
+import base64
 from schemas.notes import NoteInternalSchema, NoteUpdateInternalSchema
 from typing import Optional
 
-from .general import DB_PATH
+from .general import get_cursor
 from .accesses import check_is_owner_of_note
 
 
@@ -15,23 +15,19 @@ def add_note(note: NoteInternalSchema, from_user: int) -> None:
     :param from_user: user's id who wants to get his notes
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
-        print(len(note.aes_key))
         key_str = base64.b64encode(note.aes_key).decode()
 
         cursor.execute("""
             INSERT INTO notes (header, content, tags, aes_key, created_time, from_user_id) VALUES (?, ?, ?, ?, ?, ?)
         """, (note.header, note.text, note.tags, key_str, note.created_time, from_user))
-        conn.commit()
 
         # Increment counter for creating notes
         cursor.execute("""
             UPDATE statistics SET count_creating_note = count_creating_note + 1 
             WHERE user_id = ? 
         """, (from_user,))
-        conn.commit()
 
 
 def get_all_notes(user_id: int, offset: int, limit: int, tags: Optional[str]) -> dict:
@@ -43,8 +39,7 @@ def get_all_notes(user_id: int, offset: int, limit: int, tags: Optional[str]) ->
     :param tags: filter notes by tags
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         # Query and parameters
         query = f"""
@@ -78,7 +73,6 @@ def get_all_notes(user_id: int, offset: int, limit: int, tags: Optional[str]) ->
             UPDATE statistics SET count_reading_note = count_reading_note + ? 
             WHERE user_id = ? 
         """, (len(data), user_id))
-        conn.commit()
 
         # Return dictionary in understandable format
         return { item[0]: { "header": item[1], "content": item[2], "tags": item[3],
@@ -92,8 +86,7 @@ def get_note_by_id(note_id: int, user_id: int) -> dict:
     Get note by id for user if he has access for this note
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT id, header, content, tags, aes_key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
@@ -113,10 +106,9 @@ def get_note_by_id(note_id: int, user_id: int) -> dict:
 
         # Increment counter for reading notes
         cursor.execute("""
-                            UPDATE statistics SET count_reading_note = count_reading_note + 1 
-                            WHERE user_id = ? 
-                        """, (user_id,))
-        conn.commit()
+            UPDATE statistics SET count_reading_note = count_reading_note + 1 
+            WHERE user_id = ? 
+        """, (user_id,))
 
         return { "id": data[0], "header": data[1], "content": data[2], "tags": data[3], "aes_key": data[4],
                  "from_user_id": data[5], "created_time": data[6], "last_edit_time": data[7], "last_edit_user": data[8] }
@@ -127,8 +119,7 @@ def get_aes_key(note_id: int, user_id: int) -> str:
     Get aes_key from db to access note by user_id and note_id
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         if check_is_owner_of_note(user_id, note_id):
             cursor.execute("""
@@ -154,8 +145,7 @@ def delete_note_by_id(note_id: int, user_id: int) -> dict:
     Delete note by id if user is owner this note
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             DELETE FROM notes WHERE id = ? AND from_user_id = ?
@@ -173,16 +163,13 @@ def delete_note_by_id(note_id: int, user_id: int) -> dict:
             DELETE FROM accesses WHERE note_id = ?
         """, (note_id,))
 
-        conn.commit()
-
         # Increment counter for deleting notes
         cursor.execute("""
-                    UPDATE statistics SET count_deleting_note = count_deleting_note + 1 
-                    WHERE user_id = ? 
-                """, (user_id,))
-        conn.commit()
+            UPDATE statistics SET count_deleting_note = count_deleting_note + 1 
+            WHERE user_id = ? 
+        """, (user_id,))
 
-        return { "message": "Note has been successfully deleted" }
+    return { "message": "Note has been successfully deleted" }
 
 
 def check_access(note_id: int, user_id: int) -> bool:
@@ -190,8 +177,7 @@ def check_access(note_id: int, user_id: int) -> bool:
     Check user access to note
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             SELECT * FROM notes WHERE id = ? AND (from_user_id = ? OR 
@@ -206,12 +192,10 @@ def update_note(note: NoteUpdateInternalSchema) -> dict:
     Update note in db after editing
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
+    with get_cursor() as cursor:
 
         cursor.execute("""
             UPDATE notes SET header = ?, content = ?, tags = ?, last_edit_time = ?, last_edit_user = ? WHERE id = ?
         """, (note.header, note.text, note.tags, note.last_edit_time, note.last_edit_user, note.id))
-        conn.commit()
 
-        return { "message": "Note has successfully updated" }
+    return { "message": "Note has successfully updated" }
