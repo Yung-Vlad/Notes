@@ -65,5 +65,18 @@ textarea{
 }
 
 a{
-    color: var(--color-selected);
+    color: var(--links-color);
+    text-decoration: none;
+
+    &:hover{
+        color: var(--color-primary);
+        text-decoration: underline;
+    }
 }
+
+:focus-visible{
+    outline: rem(2) solid var(--color-primary);
+    outline-offset: rem(4);
+    transition-duration: 0;
+}
+

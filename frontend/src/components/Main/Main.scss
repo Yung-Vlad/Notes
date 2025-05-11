@@ -1,7 +1,58 @@
 @use '../../scss/utils/mixins.scss' as *;
 @use '../../scss/utils/functions.scss' as *;
-h1{
+h1.h1{
     text-align: center;  
-    
+    margin-top: rem(30);
 }
 
+.property-cards{
+    display: flex;
+    margin-inline: auto;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: rem(50);
+    margin-top: rem(50);
+
+    .card{
+        width: rem(300);
+        background-color: var(--color-selected);
+        text-align: center;
+        border-radius: rem(5);
+        height: rem(320);
+
+        .card-heading{
+            
+        }
+
+    }
+}
+
+
+.properties.h3{
+    color: var(--color-success);
+    text-align: center;
+    margin-top: rem(20);
+}
+
+button.start{
+    margin: 0 auto;
+    display: block;
+    background-color: var(--color-dark);
+    color: var(--color-primary);
+    padding: rem(10) rem(20);
+    border-radius: rem(5);
+    border: none;
+    font-size: rem(16);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-duration) ease-in-out;
+    margin-top: rem(50);
+    width: rem(250);
+    height: rem(60);
+    font-size: rem(26);
+
+
+    &:hover{
+        background-color: var(--color-selected);
+    }
+}

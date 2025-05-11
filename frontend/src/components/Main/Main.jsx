@@ -5,11 +5,11 @@ function Main() {
         <div className='container'>
             <h1 className='h1'>Your notes, locked and loaded</h1>
 
-            <h3 className='h3'>Fast. Secure. Yours</h3>
+            <h3 className='h3 properties'>Fast. Secure. Yours</h3>
 
-            <button>Start Writing</button>
+            <button className='start'>Start Writing</button>
 
-            <div className="properties">
+            <div className="property-cards">
                 <div className="card">
                     <h4 className='card-heading h4'>
                         Secure
