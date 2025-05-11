@@ -2,8 +2,19 @@ import './Main.scss';
 
 function Main() {
     return (  
-        <div>
-            <h1>Welcome to the Main Component</h1>
+        <div className='container'>
+            <h1>Your notes, locked and loaded</h1>
+
+            <h2>Fast. Secure. Yours</h2>
+
+            <button>Start Writing</button>
+
+            <div className="properties">
+                <div className="card">Secure</div>
+                <div className="card">Fast</div>
+                <div className="card">Cross-platform</div>
+            </div>
+
         </div>
     );
 }

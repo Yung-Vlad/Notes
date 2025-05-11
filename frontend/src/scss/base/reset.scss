@@ -1,0 +1,73 @@
+/* reset.scss */
+
+/* Box sizing reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Remove default margin and padding */
+body,
+h1, h2, h3, h4, h5, h6,
+p, blockquote, pre,
+dl, dd, ol, ul,
+figure,
+hr,
+fieldset, legend,
+button,
+input, textarea,
+select {
+  margin: 0;
+  padding: 0;
+}
+
+/* Remove list styles */
+ul, ol {
+  list-style: none;
+}
+
+/* Set base font and background */
+body {
+  line-height: 1.5;
+  font-family: system-ui, sans-serif;
+  background-color: #000;
+  color: #fff;
+}
+
+/* Remove text decoration and set color inheritance */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Remove border and inherit font styles for form elements */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  outline: none;
+}
+
+/* Ensure media fits the container */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Remove animations and transitions for users with reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
