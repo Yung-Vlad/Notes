@@ -1,0 +1,22 @@
+@use './functions' as *;
+@use './media' as *;
+
+:root{
+    
+    --color-primary: #ffffff;
+    --color-success: #398557;
+    --color-danger: #dc3545;
+    --color-warning: #ffc107;
+    --color-selected: #2e2f30;
+    --color-dark: #000000;
+
+    --container-width: #{rem(1200)};
+    --container-padding: #{rem(20)};
+
+    --transition-duration: 0.2s;
+
+    @include laptop {
+        --container-width: #{rem(900)};
+    }
+
+}

@@ -1,5 +1,7 @@
 @use '../../scss/utils/mixins.scss' as *;
+@use '../../scss/utils/functions.scss' as *;
 h1{
     text-align: center;  
-    @include fluid-text(48, 16);
+    
 }
+
