@@ -1,0 +1,16 @@
+@use '../utils/functions' as *;
+
+.button {
+    min-width: rem(137);
+    padding: rem(18) rem(24);
+    border: none;
+    cursor: pointer;
+    padding: rem(10) rem(20);
+    border-radius: rem(5);
+    transition: all var(--transition-duration) ease-in-out;
+
+    &:hover {
+        background-color: var(--color-selected);
+    }
+
+}

@@ -13,6 +13,12 @@ h1.h1{
     gap: rem(50);
     margin-top: rem(50);
 
+    svg{
+        margin: rem(25) auto rem(15);
+        width: rem(80);
+        height: rem(80);
+    }
+
     .card{
         width: rem(300);
         background-color: var(--color-selected);
@@ -35,24 +41,16 @@ h1.h1{
 }
 
 button.start{
-    margin: 0 auto;
     display: block;
     background-color: var(--color-dark);
     color: var(--color-primary);
-    padding: rem(10) rem(20);
-    border-radius: rem(5);
-    border: none;
-    font-size: rem(16);
+    font-size: rem(26);
     font-weight: 600;
-    cursor: pointer;
-    transition: all var(--transition-duration) ease-in-out;
-    margin-top: rem(50);
     width: rem(250);
     height: rem(60);
-    font-size: rem(26);
-
-
-    &:hover{
-        background-color: var(--color-selected);
+    margin: rem(50) auto;
+    a{
+        color: var(--color-primary);
+        text-decoration: none;
     }
 }
