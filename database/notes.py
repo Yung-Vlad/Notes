@@ -81,21 +81,29 @@ def get_all_notes(user_id: int, offset: int, limit: int, tags: Optional[str]) ->
                  for item in data }
 
 
-def get_note_by_id(note_id: int, user_id: int) -> dict:
+def get_note_by_id(note_id: int, user_id: int, by_link=False) -> dict:
     """
     Get note by id for user if he has access for this note
     """
 
     with get_cursor() as cursor:
 
-        cursor.execute("""
-            SELECT id, header, content, tags, aes_key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
-            WHERE id = ? AND from_user_id = ?
-            UNION
-            SELECT id, header, content, tags, accesses.key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
-            INNER JOIN accesses ON notes.id = accesses.note_id
-            WHERE accesses.note_id = ? AND accesses.user_id = ?
-        """, (note_id, user_id, note_id, user_id))
+        if not by_link:
+            cursor.execute("""
+                SELECT id, header, content, tags, aes_key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
+                WHERE id = ? AND from_user_id = ?
+                UNION
+                SELECT id, header, content, tags, accesses.key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
+                INNER JOIN accesses ON notes.id = accesses.note_id
+                WHERE accesses.note_id = ? AND accesses.user_id = ?
+            """, (note_id, user_id, note_id, user_id))
+
+        else:
+            cursor.execute("""
+                SELECT id, header, content, tags, shared_notes.key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
+                INNER JOIN shared_notes ON shared_notes.note_id = notes.id
+                WHERE note_id = ?
+            """, (note_id,))
 
         data = cursor.fetchone()
         if not data:
@@ -138,6 +146,24 @@ def get_aes_key(note_id: int, user_id: int) -> str:
             )
 
         return data[0]
+
+
+def get_shared_key(note_id: int, link: str) -> dict:
+    """
+    Get aes_key from shared_notes to decrypt note
+    """
+
+    with get_cursor() as cursor:
+
+        cursor.execute("""
+            SELECT key FROM shared_notes WHERE note_id = ? AND link = ?
+        """, (note_id, link))
+
+        data = cursor.fetchone()
+        if not data:
+            return { "message": "Access denied!" }
+
+        return { "key": data[0] }
 
 
 def delete_note_by_id(note_id: int, user_id: int) -> dict:
@@ -199,3 +225,20 @@ def update_note(note: NoteUpdateInternalSchema) -> dict:
         """, (note.header, note.text, note.tags, note.last_edit_time, note.last_edit_user, note.id))
 
     return { "message": "Note has successfully updated" }
+
+
+def create_shared_note(owner_id: int, note_id: int, key: str, link: str) -> None:
+
+    with get_cursor() as cursor:
+
+        cursor.execute("""
+            INSERT INTO shared_notes VALUES (?, ?, ?, ?)
+        """, (note_id, owner_id, key, link))
+
+def delete_shared_note(note_id: int) -> None:
+
+    with get_cursor() as cursor:
+
+        cursor.execute("""
+            DELETE FROM shared_notes WHERE note_id = ?
+        """, (note_id,))

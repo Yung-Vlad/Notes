@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status
 
-import sqlite3, base64
+import base64
 from datetime import datetime
 from schemas.admins import AdminSchema
 from schemas.users import UserCreateSchema

@@ -14,13 +14,11 @@ def delete_notes_by_user_id(user_id: int) -> dict:
     with get_cursor() as cursor:
 
         # Delete all accesses for this notes
-        cursor.execute("""
-            DELETE FROM accesses WHERE note_id IN (SELECT id FROM notes WHERE from_user_id = ?)
-        """, (user_id,))
-
-        cursor.execute("""
-            DELETE FROM notes WHERE from_user_id = ?
-        """, (user_id,))
+        cursor.executescript("""
+            DELETE FROM accesses WHERE note_id IN (SELECT id FROM notes WHERE from_user_id = ?);
+            DELETE FROM notes WHERE from_user_id = ?;
+            DELETE FROM shared_notes WHERE user_id = ?;
+        """, (user_id, user_id, user_id))
 
         if cursor.rowcount == 0:
             raise HTTPException(
@@ -74,9 +72,11 @@ def delete_user_by_id(user_id: int) -> dict:
 def delete_note_by_id(note_id: int) -> dict:
     with get_cursor() as cursor:
 
-        cursor.execute("""
-            DELETE FROM notes WHERE id = ?
-        """, (note_id,))
+        cursor.executescript("""
+            DELETE FROM notes WHERE id = ?;
+            DELETE FROM shared_notes WHERE note_id = ?;
+            DELETE FROM accesses WHERE note_id = ?;
+        """, (note_id, note_id, note_id))
 
         if cursor.rowcount == 0:
             raise HTTPException(

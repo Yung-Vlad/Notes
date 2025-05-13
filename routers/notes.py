@@ -1,18 +1,25 @@
+import os
+
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 
 import base64
 from typing import Optional
 from datetime import datetime
 
+from starlette.status import HTTP_404_NOT_FOUND
+
 from secure.tokens import JWT, CSRF
 from schemas.notes import NoteSchema, NoteUpdateSchema, NoteInternalSchema, NoteUpdateInternalSchema
 from cipher.encrypting import symmetric_encrypt_note, encrypt_aes_key
-from cipher.decrypting import decrypt_note, decrypt_aes_key, get_private_key
+from cipher.decrypting import decrypt_note, decrypt_aes_key, get_private_key, symmetric_decrypt_data
 from cipher.generate import generate_aes_key
 from database.users import get_public_key
+from database.accesses import check_is_owner_of_note
 from database.notes import (add_note, delete_note_by_id,
                             get_all_notes, get_note_by_id,
-                            check_access, update_note, get_aes_key)
+                            check_access, update_note,
+                            get_aes_key, create_shared_note,
+                            get_shared_key, delete_shared_note)
 
 
 router = APIRouter(prefix="/notes", tags=["Notes"])
@@ -85,6 +92,27 @@ async def get_note(note_id: int,
     return { "note": decrypted_note }
 
 
+@router.get("/{note_id}/{link}",
+         summary="Viewing note by shared link")
+async def get_note(note_id: int, link: str,
+                   curr_user: dict = Depends(JWT.get_current_user),
+                   _ = Depends(CSRF.verify_csrf_token)) -> dict:
+
+    key = get_shared_key(note_id, link)
+    if "message" in key.keys():  # If not found
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail=key["message"])
+
+    secret_key = base64.b64decode(key["key"])
+    note = get_note_by_id(note_id, curr_user["id"], by_link=True)
+    del note["aes_key"]
+
+    note["header"] = symmetric_decrypt_data(secret_key, note["header"])
+    note["content"] = symmetric_decrypt_data(secret_key, note["content"])
+    note["tags"] = symmetric_decrypt_data(secret_key, note["tags"])
+
+    return { "note": note }
+
+
 @router.delete("/{note_id}",
             summary="Deleting note by id")
 async def delete_note(note_id: int,
@@ -102,7 +130,7 @@ async def editing_note(note: NoteUpdateSchema,
                        _ = Depends(CSRF.verify_csrf_token)) -> dict:
 
     if not check_access(note.id, curr_user["id"]):
-        return { "message": "Note not found or access denied" }
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found or access denied")
 
     if not note.header or not note.text:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incorrect input of note!")
@@ -117,3 +145,40 @@ async def editing_note(note: NoteUpdateSchema,
     decrypted_aes_key = decrypt_aes_key(private_key, aes_key)  # Decrypted aes_key
 
     return update_note(symmetric_encrypt_note(decrypted_aes_key, note))
+
+
+@router.post("/share/{note_id}", summary="Share with other users",
+             description="Create link for sharing with other user")
+async def sharing_note(note_id: int, curr_user: dict = Depends(JWT.get_current_user),
+                       _ = Depends(CSRF.verify_csrf_token)) -> dict:
+
+    user_id = curr_user["id"]
+
+    if not check_is_owner_of_note(note_id, user_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found or access denied")
+
+    username = curr_user["username"]
+    aes_key = base64.b64decode(get_aes_key(note_id, user_id))
+    private_pem = get_private_key(username)
+
+    key = base64.b64encode(decrypt_aes_key(private_pem, aes_key)).decode()
+    link = base64.b64encode(os.urandom(12)).decode()  # Random symbols for link
+
+    # Save to db
+    create_shared_note(user_id, note_id, key, link)
+
+    return { "message": "Successful!",
+             "link": f"http://127.0.0.1/notes/{note_id}/{link}" }
+
+@router.delete("/delete-sharing/{note_id}", summary="Delete shared link",
+               description="Owner of note can delete shared note by id")
+async def delete_shared_link(note_id: int,
+                             curr_user: dict = Depends(JWT.get_current_user),
+                             _ = Depends(CSRF.verify_csrf_token)) -> dict:
+
+    if not check_is_owner_of_note(note_id, curr_user["id"]):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found or access denied")
+
+    delete_shared_note(note_id)
+
+    return { "message": "Shared link was successfully removed" }

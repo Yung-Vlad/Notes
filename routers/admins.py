@@ -11,7 +11,7 @@ from secure.hashing import Hasher
 from secure.validating import Checker
 from schemas.admins import AdminSchema
 from database.general import DB_PATH
-from database.admin import delete_user_by_id, delete_note_by_id, delete_all_users
+from database.admins import delete_user_by_id, delete_note_by_id, delete_all_users
 from database.users import create_user
 
 

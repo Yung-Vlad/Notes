@@ -1,6 +1,5 @@
 from fastapi import HTTPException, status
 
-import sqlite3
 from schemas.accesses import AccessInternalSchema, AccessSchema
 
 from .general import get_cursor

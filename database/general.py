@@ -92,6 +92,18 @@ def init_db() -> None:
             );
         """)
 
+        # Table shared by link
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS shared_notes (
+                note_id INTEGER,
+                owner_id INTEGER,
+                key TEXT UNIQUE NOT NULL,
+                link TEXT UNIQUE NOT NULL,
+                FOREIGN KEY (note_id) REFERENCES notes(id)
+                FOREIGN KEY (owner_id) REFERENCES users(id)
+            );
+        """)
+
 
 def check_existing_email(email: str) -> bool:
     """
