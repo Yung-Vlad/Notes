@@ -1,11 +1,11 @@
 from fastapi import HTTPException, Depends, status, Response, Request, APIRouter
 from fastapi.security import OAuth2PasswordRequestForm
 
-import secrets, os
+import secrets, os, hashlib
 from datetime import timedelta, datetime
 
 from database.users import (create_user, get_user, get_statistics, reset_password,
-                            get_email, restore_password, check_restore_password_exists)
+                            get_email, restore_password, check_restore_password_exists, set_refresh_token)
 from secure.tokens import JWT, CSRF
 from secure.validating import Validator
 from schemas.users import UserCreateSchema, ResetPasswordSchema, RestorePasswordSchema, ConfirmRestoringPasswordSchema
@@ -33,11 +33,13 @@ async def signup(request: Request, user: UserCreateSchema) -> dict:
 
 @router.post("/signin",
              summary="Authentication user")
-async def login(request: Request, response: Response, data: OAuth2PasswordRequestForm = Depends()) -> dict:
+async def login(request: Request, response: Response,
+                data: OAuth2PasswordRequestForm = Depends()) -> dict:
     if check_logged(request):
         return { "message": "You already logged" }
 
     user = get_user(data.username)
+    username = user["username"]
 
     # Check username and password
     if not user or not Hasher.verify_password(data.password, user["password"]):
@@ -47,10 +49,11 @@ async def login(request: Request, response: Response, data: OAuth2PasswordReques
             headers={ "WWW-Authenticate": "Bearer" }
         )
 
-    # Create jwt access token
-    access_token_expires = timedelta(minutes=JWT.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = JWT.create_access_token({ "sub": user["username"] },
-                                       access_token_expires)
+    # Create jwt tokens
+    access_token = JWT.create_access_token({ "sub": username })
+    refresh_token = JWT.create_refresh_token(username)
+    hashed_refresh_token = hashlib.sha256(refresh_token.encode()).hexdigest()
+    set_refresh_token(username, hashed_refresh_token)
 
     # Create csrf token
     csrf_token = secrets.token_hex(16)
@@ -60,7 +63,13 @@ async def login(request: Request, response: Response, data: OAuth2PasswordReques
         key="access_token",
         value=access_token,
         httponly=True,
-        max_age=60 * JWT.ACCESS_TOKEN_EXPIRE_MINUTES,
+        samesite="lax"
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
         samesite="lax"
     )
 

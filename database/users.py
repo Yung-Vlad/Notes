@@ -159,3 +159,25 @@ def get_public_key(user_id: int) -> bytes:
         """, (user_id,))
 
         return str(cursor.fetchone()[0]).encode()
+
+
+def set_refresh_token(username: str, token: str) -> None:
+    with get_cursor() as cursor:
+
+        cursor.execute("""
+            UPDATE users SET refresh_token = ? WHERE username = ?
+        """, (token, username))
+
+def get_refresh_token(username: str) -> str | None:
+    with get_cursor() as cursor:
+
+        cursor.execute("""
+            SELECT refresh_token FROM users WHERE username = ?
+        """, (username,))
+
+        data = cursor.fetchone()
+        if not data:
+            return None
+
+        return data[0]
+

@@ -38,7 +38,8 @@ def init_db() -> None:
                 password TEXT NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 is_admin BOOLEAN DEFAULT 0,
-                public_key TEXT UNIQUE NOT NULL
+                public_key TEXT UNIQUE NOT NULL,
+                refresh_token TEXT UNIQUE
             );
         """)
 
