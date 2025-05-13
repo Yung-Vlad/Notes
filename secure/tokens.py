@@ -10,7 +10,7 @@ from database.users import get_user, set_refresh_token, get_refresh_token
 
 class JWT:
     __KEY: str = os.getenv("KEY")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 2
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 20
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     __ALGORITHM: str = "HS256"
     __PRIVATE_KEYS_PATH = "private_keys"
@@ -68,51 +68,57 @@ class JWT:
             headers={ "WWW-Authenticate": "Bearer" }
         )
 
-        try:
-            token = request.cookies.get("refresh_token")
-            if not token:
+        try:  # Try access token
+            access_token = request.cookies.get("access_token")
+            if not access_token:
                 raise auth_exception
 
-            unverified = jwt.decode(token, options={"verify_signature": False})
-            username = unverified.get("sub")
-            if not username:
+            payload = jwt.decode(access_token, JWT.__KEY, JWT.__ALGORITHM)
+            username = payload.get("sub")
+
+        except jwt.PyJWTError:  # Try refresh token
+            try:
+                refresh_token = request.cookies.get("refresh_token")
+                if not refresh_token:
+                    raise auth_exception
+
+                unverified = jwt.decode(refresh_token, options={"verify_signature": False})
+                username = unverified.get("sub")
+                if not username:
+                    raise auth_exception
+
+                if not JWT.__compare_refresh_tokens(username, refresh_token):
+                    raise auth_exception
+
+                # Create jwt tokens
+                access_token = JWT.create_access_token({"sub": username})
+                refresh_token = JWT.create_refresh_token(username)
+                hashed_refresh_token = hashlib.sha256(refresh_token.encode()).hexdigest()
+                set_refresh_token(username, hashed_refresh_token)
+
+                # Set jwt to HttpOnlyCookie
+                response.set_cookie(
+                    key="access_token",
+                    value=access_token,
+                    httponly=True,
+                    samesite="lax"
+                )
+
+                response.set_cookie(
+                    key="refresh_token",
+                    value=refresh_token,
+                    httponly=True,
+                    samesite="lax"
+                )
+            except jwt.PyJWTError:
                 raise auth_exception
-
-            key = JWT.__load_user_key(username)
-            payload = jwt.decode(token, key, JWT.__ALGORITHM)
-
-            if not JWT.__compare_refresh_tokens(username, token):
-                raise  auth_exception
-
-            # Create jwt tokens
-            access_token = JWT.create_access_token({"sub": username})
-            refresh_token = JWT.create_refresh_token(username)
-            hashed_refresh_token = hashlib.sha256(refresh_token.encode()).hexdigest()
-            set_refresh_token(username, hashed_refresh_token)
-
-            # Set jwt to HttpOnlyCookie
-            response.set_cookie(
-                key="access_token",
-                value=access_token,
-                httponly=True,
-                samesite="lax"
-            )
-
-            response.set_cookie(
-                key="refresh_token",
-                value=refresh_token,
-                httponly=True,
-                samesite="lax"
-            )
-
-        except jwt.PyJWTError:
-            raise auth_exception
 
         user = get_user(username)
         if not user:
             raise auth_exception
 
         return user
+
 
     # Check admin by JWT
     @staticmethod

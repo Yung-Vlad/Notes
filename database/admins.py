@@ -41,7 +41,7 @@ def delete_statistics_by_user_id(user_id: int) -> None:
         """, (user_id,))
 
 
-def delete_user_by_id(user_id: int) -> dict:
+def delete_user_by_id(user_id: int, himself=False) -> dict:
     with get_cursor() as cursor:
 
         cursor.execute("""
@@ -58,8 +58,8 @@ def delete_user_by_id(user_id: int) -> dict:
         # Delete private key
         delete_user_pkey(row[0])
 
-        cursor.execute("""
-            DELETE FROM users WHERE id = ? AND is_admin = 0
+        cursor.execute(f"""
+            DELETE FROM users WHERE id = ? {not himself if "AND is_admin = 0" else ""}
         """, (user_id,))
 
         # Delete his notes and statistics

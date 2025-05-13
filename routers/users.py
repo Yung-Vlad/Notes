@@ -6,6 +6,7 @@ from datetime import timedelta, datetime
 
 from database.users import (create_user, get_user, get_statistics, reset_password,
                             get_email, restore_password, check_restore_password_exists, set_refresh_token)
+from database.admins import delete_user_by_id
 from secure.tokens import JWT, CSRF
 from secure.validating import Validator
 from schemas.users import UserCreateSchema, ResetPasswordSchema, RestorePasswordSchema, ConfirmRestoringPasswordSchema
@@ -39,6 +40,9 @@ async def login(request: Request, response: Response,
         return { "message": "You already logged" }
 
     user = get_user(data.username)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found!")
+
     username = user["username"]
 
     # Check username and password
@@ -197,6 +201,15 @@ async def statistics(curr_user: dict = Depends(JWT.get_current_user),
     user_id = curr_user["id"]
 
     return get_statistics(user_id)
+
+
+@router.delete("/delete-user", summary="Delete user")
+async def delete_user(curr_user: dict = Depends(JWT.get_current_user),
+               _ = Depends(CSRF.verify_csrf_token)) -> dict:
+    user_id = curr_user["id"]
+    delete_user_by_id(user_id, himself=True)
+
+    return { "message": "User was successfully deleted" }
 
 
 # Check if user logged
