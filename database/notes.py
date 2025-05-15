@@ -1,4 +1,7 @@
+from datetime import datetime
+
 from fastapi import HTTPException, status
+from fastapi_utils.tasks import repeat_every
 
 import base64
 from schemas.notes import NoteInternalSchema, NoteUpdateInternalSchema
@@ -20,8 +23,9 @@ def add_note(note: NoteInternalSchema, from_user: int) -> None:
         key_str = base64.b64encode(note.aes_key).decode()
 
         cursor.execute("""
-            INSERT INTO notes (header, content, tags, aes_key, created_time, from_user_id) VALUES (?, ?, ?, ?, ?, ?)
-        """, (note.header, note.text, note.tags, key_str, note.created_time, from_user))
+            INSERT INTO notes (header, content, tags, aes_key, created_time, active_time, from_user_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (note.header, note.text, note.tags, key_str, note.created_time, note.active_time, from_user))
 
         # Increment counter for creating notes
         cursor.execute("""
@@ -47,7 +51,7 @@ def get_all_notes(user_id: int, offset: int, limit: int, tags: Optional[str]) ->
                 SELECT * FROM notes WHERE from_user_id = ? 
                 UNION
                 SELECT id, header, content, tags, accesses.key, from_user_id,
-                    created_time, last_edit_time, last_edit_user 
+                    created_time, active_time, last_edit_time, last_edit_user 
                 FROM notes 
                 INNER JOIN accesses ON notes.id = accesses.note_id WHERE accesses.user_id = ?
             )
@@ -75,10 +79,14 @@ def get_all_notes(user_id: int, offset: int, limit: int, tags: Optional[str]) ->
         """, (len(data), user_id))
 
         # Return dictionary in understandable format
-        return { item[0]: { "header": item[1], "content": item[2], "tags": item[3],
-                            "aes_key": item[4], "from_user_id": item[5],
-                            "created_time": item[6], "last_edit_time": item[7], "last_edit_user": item[8] }
-                 for item in data }
+        return {
+            item[0]: {
+                "header": item[1], "content": item[2], "tags": item[3],
+                "aes_key": item[4], "from_user_id": item[5], "created_time": item[6],
+                "active_time": item[7], "last_edit_time": item[8], "last_edit_user": item[9]
+            }
+            for item in data
+        }
 
 
 def get_note_by_id(note_id: int, user_id: int, by_link=False) -> dict:
@@ -90,17 +98,17 @@ def get_note_by_id(note_id: int, user_id: int, by_link=False) -> dict:
 
         if not by_link:
             cursor.execute("""
-                SELECT id, header, content, tags, aes_key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
+                SELECT id, header, content, tags, aes_key, from_user_id, created_time, active_time, last_edit_time, last_edit_user FROM notes
                 WHERE id = ? AND from_user_id = ?
                 UNION
-                SELECT id, header, content, tags, accesses.key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
+                SELECT id, header, content, tags, accesses.key, from_user_id, created_time, active_time, last_edit_time, last_edit_user FROM notes
                 INNER JOIN accesses ON notes.id = accesses.note_id
                 WHERE accesses.note_id = ? AND accesses.user_id = ?
             """, (note_id, user_id, note_id, user_id))
 
         else:
             cursor.execute("""
-                SELECT id, header, content, tags, shared_notes.key, from_user_id, created_time, last_edit_time, last_edit_user FROM notes
+                SELECT id, header, content, tags, shared_notes.key, from_user_id, created_time, active_time, last_edit_time, last_edit_user FROM notes
                 INNER JOIN shared_notes ON shared_notes.note_id = notes.id
                 WHERE note_id = ?
             """, (note_id,))
@@ -118,8 +126,11 @@ def get_note_by_id(note_id: int, user_id: int, by_link=False) -> dict:
             WHERE user_id = ? 
         """, (user_id,))
 
-        return { "id": data[0], "header": data[1], "content": data[2], "tags": data[3], "aes_key": data[4],
-                 "from_user_id": data[5], "created_time": data[6], "last_edit_time": data[7], "last_edit_user": data[8] }
+        return {
+            "id": data[0], "header": data[1], "content": data[2], "tags": data[3],
+            "aes_key": data[4], "from_user_id": data[5], "created_time": data[6],
+            "active_time": data[7], "last_edit_time": data[8], "last_edit_user": data[9]
+        }
 
 
 def get_aes_key(note_id: int, user_id: int) -> str:
@@ -213,6 +224,37 @@ def check_access(note_id: int, user_id: int) -> bool:
         return bool(cursor.fetchone())
 
 
+@repeat_every(seconds=60)
+async def check_active_time() -> None:
+    """
+    If active time is over then delete note
+    """
+
+    with get_cursor() as cursor:
+        curr_time = datetime.now()
+
+        cursor.execute("""
+            SELECT id FROM notes WHERE active_time IS NOT NULL AND active_time <= ?
+        """, (curr_time,))
+
+        data = cursor.fetchall()
+        if not data:
+            return
+
+        for (note_id,) in data:
+            cursor.execute("""
+                DELETE FROM notes WHERE id = ?
+            """, (note_id,))
+
+            cursor.execute("""
+                DELETE FROM shared_notes WHERE note_id = ?
+            """, (note_id,))
+
+            cursor.execute("""
+                DELETE FROM accesses WHERE note_id = ?
+            """, (note_id,))
+
+
 def update_note(note: NoteUpdateInternalSchema) -> dict:
     """
     Update note in db after editing
@@ -221,8 +263,8 @@ def update_note(note: NoteUpdateInternalSchema) -> dict:
     with get_cursor() as cursor:
 
         cursor.execute("""
-            UPDATE notes SET header = ?, content = ?, tags = ?, last_edit_time = ?, last_edit_user = ? WHERE id = ?
-        """, (note.header, note.text, note.tags, note.last_edit_time, note.last_edit_user, note.id))
+            UPDATE notes SET header = ?, content = ?, tags = ?, active_time = ?, last_edit_time = ?, last_edit_user = ? WHERE id = ?
+        """, (note.header, note.text, note.tags, note.active_time, note.last_edit_time, note.last_edit_user, note.id))
 
     return { "message": "Note has successfully updated" }
 

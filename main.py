@@ -1,11 +1,24 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 
+from typing import AsyncContextManager
+from contextlib import asynccontextmanager
 from routers import users, notes, admins, accesses, errors_handler
 from database.general import init_db
+from database.notes import check_active_time
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncContextManager[None]:
+    # Startup
+    await check_active_time()
+
+    yield
+
+    # Shutdown
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(admins.router)
 app.include_router(users.router)

@@ -32,6 +32,7 @@ async def create_admin(request: Request, admin: AdminSchema) -> dict:
 
     Checker.check_user_data(admin)
 
+    JWT.generate_user_key(admin.username)
     admin.password = Hasher.get_password_hash(admin.password)
     create_user(admin, True)
 

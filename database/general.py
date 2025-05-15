@@ -53,6 +53,7 @@ def init_db() -> None:
                         aes_key TEXT UNIQUE NOT NULL,
                         from_user_id INTEGER NOT NULL,
                         created_time TEXT NOT NULL,
+                        active_time DATETIME,
                         last_edit_time TEXT,
                         last_edit_user INTEGER,
                         FOREIGN KEY (from_user_id) REFERENCES users(id)

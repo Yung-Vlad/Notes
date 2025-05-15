@@ -14,11 +14,17 @@ def delete_notes_by_user_id(user_id: int) -> dict:
     with get_cursor() as cursor:
 
         # Delete all accesses for this notes
-        cursor.executescript("""
+        cursor.execute("""
             DELETE FROM accesses WHERE note_id IN (SELECT id FROM notes WHERE from_user_id = ?);
+        """, (user_id,))
+
+        cursor.execute("""
             DELETE FROM notes WHERE from_user_id = ?;
+        """, (user_id,))
+
+        cursor.execute("""
             DELETE FROM shared_notes WHERE user_id = ?;
-        """, (user_id, user_id, user_id))
+        """, (user_id,))
 
         if cursor.rowcount == 0:
             raise HTTPException(
@@ -55,12 +61,19 @@ def delete_user_by_id(user_id: int, himself=False) -> dict:
                 detail="User not found"
             )
 
-        # Delete private key
-        delete_user_pkey(row[0])
 
         cursor.execute(f"""
-            DELETE FROM users WHERE id = ? {not himself if "AND is_admin = 0" else ""}
+            DELETE FROM users WHERE id = ? {"AND is_admin = 0" if not himself else ""}
         """, (user_id,))
+
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found or access denied!"
+            )
+
+        # Delete private key
+        delete_user_keys(row[0])
 
         # Delete his notes and statistics
         delete_notes_by_user_id(user_id)
@@ -102,7 +115,7 @@ def delete_all_users() -> dict:
             )
 
         # Delete private keys
-        delete_user_pkey([name[0] for name in row])
+        delete_user_keys([name[0] for name in row])
 
         cursor.executescript("""
             DELETE FROM users WHERE is_admin = 0;
@@ -115,11 +128,12 @@ def delete_all_users() -> dict:
 
 
 # Delete private key by username
-def delete_user_pkey(username: str | list) -> None:
+def delete_user_keys(username: str | list) -> None:
     try:
         if username is list:
             for name in username:
                 os.remove(f"{KEYS_PATH}/{name}_key.pem")
+                os.remove(f"{KEYS_PATH}/{name}.key")
             return
 
         os.remove(f"{KEYS_PATH}/{username}_key.pem")

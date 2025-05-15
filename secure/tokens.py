@@ -33,7 +33,7 @@ class JWT:
             "sub": username
         }
 
-        return jwt.encode(to_encode, JWT.generate_user_key(username), JWT.__ALGORITHM)
+        return jwt.encode(to_encode, JWT.__load_user_key(username), JWT.__ALGORITHM)
 
     @staticmethod
     def generate_user_key(username: str) -> str:
@@ -55,7 +55,7 @@ class JWT:
 
     @staticmethod
     def __compare_refresh_tokens(username: str, provided_token: str) -> bool:
-        stored_token = get_refresh_token(username)
+        stored_token = get_refresh_token(username)  # hashed token from db
         hashed_token = hashlib.sha256(provided_token.encode()).hexdigest()
         return hmac.compare_digest(stored_token, hashed_token)
 

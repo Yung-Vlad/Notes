@@ -27,6 +27,7 @@ async def signup(request: Request, user: UserCreateSchema) -> dict:
 
     # Hash password and register new user
     user.password = Hasher.get_password_hash(user.password)
+    JWT.generate_user_key(user.username)
     create_user(user)
 
     return { "message": "User registered successfully" }
