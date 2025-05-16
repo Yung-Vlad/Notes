@@ -64,22 +64,22 @@ async def download_backup(_: dict = Depends(JWT.get_admin),
 
 @router.delete("/delete-user/{user_id}", summary="Delete user by id")
 async def delete_user(user_id: int,
-                _ = Depends(JWT.get_admin),
-                __ = Depends(CSRF.verify_csrf_token)) -> dict:
+                    admin: dict = Depends(JWT.get_admin),
+                    _ = Depends(CSRF.verify_csrf_token)) -> dict:
 
-    return delete_user_by_id(user_id)
+    return delete_user_by_id(user_id, admin["id"])
 
 
 @router.delete("/delete-users", summary="Delete all users")
-async def delete_users(_ = Depends(JWT.get_admin),
-                __ = Depends(CSRF.verify_csrf_token)) -> dict:
+async def delete_users(admin: dict = Depends(JWT.get_admin),
+                _=Depends(CSRF.verify_csrf_token)) -> dict:
 
-    return delete_all_users()
+    return delete_all_users(admin["id"])
 
 
 @router.delete("/delete-note/{note_id}", summary="Delete note by id")
 async def delete_note(note_id: int,
-                _=Depends(JWT.get_admin),
-                __=Depends(CSRF.verify_csrf_token)) -> dict:
+                admin: dict = Depends(JWT.get_admin),
+                _=Depends(CSRF.verify_csrf_token)) -> dict:
 
-    return delete_note_by_id(note_id)
+    return delete_note_by_id(note_id, admin["id"])

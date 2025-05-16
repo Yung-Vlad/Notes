@@ -8,9 +8,9 @@ class NoteSchema(BaseModel):
     tags: str | None = Field(max_length=50)
     active_time: datetime | str | None = Field(default=datetime.now().strftime("%H:%M %d-%m-%Y"))
 
+    @staticmethod
     @field_validator("active_time")
-    def str_to_datetime(cls, value: object) -> object:
-        print("abc")
+    def str_to_datetime(value: object) -> object:
         if isinstance(value, str):
             return datetime.strptime(value, "%H:%M %d-%m-%Y")
 

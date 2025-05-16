@@ -1,3 +1,5 @@
+from idlelib.debugobj import dispatch
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 
@@ -6,6 +8,7 @@ from contextlib import asynccontextmanager
 from routers import users, notes, admins, accesses, errors_handler
 from database.general import init_db
 from database.notes import check_active_time
+from middleware.ddos_protection import DdosProtectionMiddleware
 
 
 @asynccontextmanager
@@ -24,6 +27,7 @@ app.include_router(admins.router)
 app.include_router(users.router)
 app.include_router(notes.router)
 app.include_router(accesses.router)
+app.add_middleware(DdosProtectionMiddleware)
 
 app.add_exception_handler(RequestValidationError, errors_handler.validation_exception_handler)
 
